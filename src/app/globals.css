@@ -9,9 +9,13 @@
 }
 
 html, body {
-  overflow: hidden;
-  background: #000;
-  color: #fff;
+  background: #f2f0ed;
+  color: #111;
   width: 100%;
   height: 100%;
+}
+
+/* Cylinder view: no scroll */
+body:has(canvas) {
+  overflow: hidden;
 }
