@@ -299,20 +299,20 @@ export default function Home() {
   // ---- Cylinder View ----
   return (
     <div className="relative w-screen h-screen overflow-hidden bg-[#f2f0ed]">
-      <div ref={containerRef} className="w-full h-full" />
+      <div ref={containerRef} className="absolute inset-0" style={{ zIndex: 0 }} />
 
       {/* Top: site name */}
-      <div className="absolute top-5 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+      <div className="absolute top-5 left-1/2 -translate-x-1/2 pointer-events-none" style={{ zIndex: 20 }}>
         <h1 className="text-sm tracking-[0.3em] text-neutral-400 uppercase select-none">
           Our Orbit
         </h1>
       </div>
 
       {/* Center: black sphere (CSS) */}
-      <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
+      <div className="absolute inset-0 flex items-center justify-center" style={{ zIndex: 20 }}>
         <button
           onClick={() => setView({ mode: "grid" })}
-          className="pointer-events-auto w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-[#111] flex items-center justify-center shadow-2xl hover:scale-105 transition-transform duration-300 cursor-pointer"
+          className="w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-[#111] flex items-center justify-center shadow-2xl hover:scale-105 transition-transform duration-300 cursor-pointer"
         >
           <span className="text-white text-base sm:text-lg font-light tracking-[0.15em]">
             Enter
@@ -321,7 +321,7 @@ export default function Home() {
       </div>
 
       {/* Bottom */}
-      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
+      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 pointer-events-none" style={{ zIndex: 20 }}>
         <span className="text-xs tracking-[0.2em] text-neutral-400 uppercase select-none">
           A & M
         </span>
