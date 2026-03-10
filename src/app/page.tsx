@@ -3,40 +3,23 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import * as THREE from "three";
 
-/*
- * Our Orbit — OpenPurpose-style Cylinder Gallery
- *
- * White background. Photos on cylinder inner wall with perspective.
- * Large black sphere in center with rotating text.
- * Click sphere → transitions to grid gallery ("All Images").
- * Drag to rotate cylinder. Auto-rotate when idle.
- */
-
 const PHOTO_COUNT = 25;
 const PHOTOS = Array.from({ length: PHOTO_COUNT }, (_, i) =>
   `/photos/${String(i + 1).padStart(2, "0")}.jpg`
 );
 
+type ViewState =
+  | { mode: "cylinder" }
+  | { mode: "grid" }
+  | { mode: "detail"; index: number };
+
 export default function Home() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [view, setView] = useState<"cylinder" | "grid">("cylinder");
-  const sceneRef = useRef<{
-    renderer: THREE.WebGLRenderer;
-    scene: THREE.Scene;
-    camera: THREE.PerspectiveCamera;
-    photoGroup: THREE.Group;
-    sphere: THREE.Mesh;
-    raf: number;
-    rotationY: number;
-    velocityY: number;
-    isDragging: boolean;
-    prevX: number;
-    autoRotate: boolean;
-  } | null>(null);
+  const [view, setView] = useState<ViewState>({ mode: "cylinder" });
 
-  // ---- Cylinder View (Three.js) ----
+  // ---- Cylinder View ----
   useEffect(() => {
-    if (view !== "cylinder") return;
+    if (view.mode !== "cylinder") return;
     const container = containerRef.current;
     if (!container) return;
 
@@ -44,10 +27,10 @@ export default function Home() {
     scene.background = new THREE.Color(0xf2f0ed);
 
     const camera = new THREE.PerspectiveCamera(
-      55,
+      40, // Narrower FOV = less distortion
       window.innerWidth / window.innerHeight,
       0.1,
-      100
+      200
     );
     camera.position.set(0, 0, 0);
 
@@ -55,19 +38,19 @@ export default function Home() {
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.outputColorSpace = THREE.SRGBColorSpace;
-    renderer.shadowMap.enabled = false;
     container.appendChild(renderer.domElement);
 
-    // ---- Photo layout on cylinder ----
-    const radius = 9;
-    const cols = 8; // photos per ring
+    // Much larger radius = photos further away = less perspective distortion
+    const radius = 22;
+    const cols = 8;
     const rows = Math.ceil(PHOTOS.length / cols);
-    const photoW = 2.4;
-    const photoH = 1.7;
-    const rowGap = 0.6;
+    const photoW = 4.5;
+    const photoH = 3.2;
+    const rowGap = 1.0;
 
     const photoGroup = new THREE.Group();
     const loader = new THREE.TextureLoader();
+    const photoMeshes: THREE.Mesh[] = [];
 
     PHOTOS.forEach((src, i) => {
       const col = i % cols;
@@ -79,112 +62,105 @@ export default function Home() {
       const z = Math.cos(angle) * radius;
       const y = (row - (rows - 1) / 2) * (photoH + rowGap);
 
+      // Card backing
+      const backGeo = new THREE.PlaneGeometry(photoW + 0.3, photoH + 0.3);
+      const backMat = new THREE.MeshBasicMaterial({ color: 0xeae7e2, side: THREE.FrontSide });
+      const back = new THREE.Mesh(backGeo, backMat);
+      back.position.set(x, y, z);
+      back.lookAt(0, y, 0);
+      const norm = new THREE.Vector3().subVectors(new THREE.Vector3(0, y, 0), back.position).normalize();
+      back.position.add(norm.clone().multiplyScalar(-0.05));
+      photoGroup.add(back);
+
+      // Photo
       const geo = new THREE.PlaneGeometry(photoW, photoH);
       const tex = loader.load(src);
       tex.colorSpace = THREE.SRGBColorSpace;
-
       const mat = new THREE.MeshBasicMaterial({
         map: tex,
         side: THREE.FrontSide,
-        transparent: true,
-        opacity: 0.92,
       });
-
       const mesh = new THREE.Mesh(geo, mat);
       mesh.position.set(x, y, z);
       mesh.lookAt(0, y, 0);
-
-      // Subtle shadow/card effect via a backing plane
-      const backGeo = new THREE.PlaneGeometry(photoW + 0.15, photoH + 0.15);
-      const backMat = new THREE.MeshBasicMaterial({
-        color: 0xe8e5e0,
-        side: THREE.FrontSide,
-      });
-      const back = new THREE.Mesh(backGeo, backMat);
-      back.position.copy(mesh.position);
-      back.quaternion.copy(mesh.quaternion);
-      // Push back slightly behind photo
-      const normal = new THREE.Vector3(0, 0, -1).applyQuaternion(mesh.quaternion);
-      back.position.add(normal.multiplyScalar(0.02));
-
-      photoGroup.add(back);
+      mesh.userData = { photoIndex: i };
       photoGroup.add(mesh);
+      photoMeshes.push(mesh);
     });
 
     scene.add(photoGroup);
 
-    // ---- Black Sphere (center) ----
-    const sphereGeo = new THREE.SphereGeometry(1.2, 64, 64);
-    const sphereMat = new THREE.MeshBasicMaterial({ color: 0x111111 });
-    const sphere = new THREE.Mesh(sphereGeo, sphereMat);
-    sphere.position.set(0, 0, 0);
-    scene.add(sphere);
-
-    // ---- Interaction ----
+    // Interaction
     let isDragging = false;
     let prevX = 0;
     let rotationY = 0;
     let velocityY = 0;
     let autoRotate = true;
-
-    const state = {
-      renderer,
-      scene,
-      camera,
-      photoGroup,
-      sphere,
-      raf: 0,
-      rotationY,
-      velocityY,
-      isDragging,
-      prevX,
-      autoRotate,
-    };
-    sceneRef.current = state;
+    let raf = 0;
 
     const onPointerDown = (e: PointerEvent) => {
-      state.isDragging = true;
-      state.prevX = e.clientX;
-      state.autoRotate = false;
-      state.velocityY = 0;
+      isDragging = true;
+      prevX = e.clientX;
+      autoRotate = false;
+      velocityY = 0;
     };
     const onPointerMove = (e: PointerEvent) => {
-      if (!state.isDragging) return;
-      const dx = e.clientX - state.prevX;
-      state.velocityY = dx * 0.002;
-      state.rotationY += dx * 0.002;
-      state.prevX = e.clientX;
+      if (!isDragging) return;
+      const dx = e.clientX - prevX;
+      velocityY = dx * 0.0008; // Slower drag
+      rotationY += dx * 0.0008;
+      prevX = e.clientX;
     };
-    const onPointerUp = () => {
-      state.isDragging = false;
-    };
+    const onPointerUp = () => { isDragging = false; };
 
-    // Click on sphere → grid view
+    // Click photo → detail
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
+    let pointerDownPos = { x: 0, y: 0 };
+
+    const onPDown2 = (e: PointerEvent) => {
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+    };
     const onClick = (e: MouseEvent) => {
+      // Only trigger if not dragged
+      const dx = e.clientX - pointerDownPos.x;
+      const dy = e.clientY - pointerDownPos.y;
+      if (Math.sqrt(dx * dx + dy * dy) > 5) return;
+
       mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
       mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
-      const hits = raycaster.intersectObject(sphere);
+      const hits = raycaster.intersectObjects(photoMeshes);
       if (hits.length > 0) {
-        setView("grid");
+        const idx = hits[0].object.userData.photoIndex;
+        if (idx !== undefined) setView({ mode: "detail", index: idx });
       }
     };
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      camera.fov = Math.max(30, Math.min(80, camera.fov + e.deltaY * 0.04));
+      camera.fov = Math.max(25, Math.min(60, camera.fov + e.deltaY * 0.03));
       camera.updateProjectionMatrix();
     };
 
     const el = renderer.domElement;
     el.addEventListener("pointerdown", onPointerDown);
+    el.addEventListener("pointerdown", onPDown2);
     el.addEventListener("pointermove", onPointerMove);
     el.addEventListener("pointerup", onPointerUp);
     el.addEventListener("pointerleave", onPointerUp);
     el.addEventListener("click", onClick);
     el.addEventListener("wheel", onWheel, { passive: false });
+
+    // Hover cursor
+    const onHover = (e: MouseEvent) => {
+      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(mouse, camera);
+      const hits = raycaster.intersectObjects(photoMeshes);
+      el.style.cursor = hits.length > 0 ? "pointer" : "grab";
+    };
+    el.addEventListener("mousemove", onHover);
 
     const onResize = () => {
       camera.aspect = window.innerWidth / window.innerHeight;
@@ -193,45 +169,32 @@ export default function Home() {
     };
     window.addEventListener("resize", onResize);
 
-    // ---- Animate ----
     function animate() {
-      state.raf = requestAnimationFrame(animate);
+      raf = requestAnimationFrame(animate);
 
-      if (state.autoRotate) {
-        state.rotationY += 0.0015;
-      } else if (!state.isDragging) {
-        state.rotationY += state.velocityY;
-        state.velocityY *= 0.96;
-        if (Math.abs(state.velocityY) < 0.00003) state.autoRotate = true;
+      if (autoRotate) {
+        rotationY += 0.0006; // Much slower auto-rotate
+      } else if (!isDragging) {
+        rotationY += velocityY;
+        velocityY *= 0.96;
+        if (Math.abs(velocityY) < 0.00002) autoRotate = true;
       }
 
-      // Rotate the photo group instead of the camera
-      photoGroup.rotation.y = state.rotationY;
-
-      // Camera looks forward
+      photoGroup.rotation.y = rotationY;
       camera.lookAt(
-        Math.sin(-state.rotationY) * 10,
+        Math.sin(-rotationY) * 10,
         0,
-        Math.cos(-state.rotationY) * 10
+        Math.cos(-rotationY) * 10
       );
 
       renderer.render(scene, camera);
     }
     animate();
 
-    // Cursor: pointer on sphere
-    const onHover = (e: MouseEvent) => {
-      mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
-      mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
-      raycaster.setFromCamera(mouse, camera);
-      const hits = raycaster.intersectObject(sphere);
-      el.style.cursor = hits.length > 0 ? "pointer" : "grab";
-    };
-    el.addEventListener("mousemove", onHover);
-
     return () => {
-      cancelAnimationFrame(state.raf);
+      cancelAnimationFrame(raf);
       el.removeEventListener("pointerdown", onPointerDown);
+      el.removeEventListener("pointerdown", onPDown2);
       el.removeEventListener("pointermove", onPointerMove);
       el.removeEventListener("pointerup", onPointerUp);
       el.removeEventListener("pointerleave", onPointerUp);
@@ -240,43 +203,91 @@ export default function Home() {
       el.removeEventListener("mousemove", onHover);
       window.removeEventListener("resize", onResize);
       renderer.dispose();
-      if (container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
-      }
+      if (container.contains(renderer.domElement)) container.removeChild(renderer.domElement);
     };
   }, [view]);
 
+  // ---- Detail View ----
+  if (view.mode === "detail") {
+    const idx = view.index;
+    return (
+      <div className="fixed inset-0 bg-[#f2f0ed] z-50 flex">
+        {/* Main image area */}
+        <div className="flex-1 flex items-center justify-center p-8 pr-4">
+          <img
+            src={PHOTOS[idx]}
+            alt={`Photo ${idx + 1}`}
+            className="max-h-[85vh] max-w-full object-contain rounded-md shadow-lg"
+          />
+        </div>
+
+        {/* Right sidebar: vertical carousel */}
+        <div className="w-20 sm:w-24 flex flex-col items-center py-6 gap-2 overflow-y-auto scrollbar-hide">
+          {PHOTOS.map((src, i) => (
+            <button
+              key={i}
+              onClick={() => setView({ mode: "detail", index: i })}
+              className={`w-14 h-14 sm:w-18 sm:h-18 rounded-md overflow-hidden flex-shrink-0 border-2 transition-all ${
+                i === idx
+                  ? "border-neutral-800 opacity-100 scale-105"
+                  : "border-transparent opacity-50 hover:opacity-80"
+              }`}
+            >
+              <img
+                src={src}
+                alt={`Thumb ${i + 1}`}
+                className="w-full h-full object-cover"
+              />
+            </button>
+          ))}
+        </div>
+
+        {/* Close / Back button */}
+        <button
+          onClick={() => setView({ mode: "cylinder" })}
+          className="absolute top-5 left-6 text-sm text-neutral-500 hover:text-black transition-colors z-10"
+        >
+          ✕
+        </button>
+
+        {/* Keyboard nav */}
+        <KeyboardNav
+          onPrev={() => setView({ mode: "detail", index: (idx - 1 + PHOTOS.length) % PHOTOS.length })}
+          onNext={() => setView({ mode: "detail", index: (idx + 1) % PHOTOS.length })}
+          onClose={() => setView({ mode: "cylinder" })}
+        />
+      </div>
+    );
+  }
+
   // ---- Grid View ----
-  if (view === "grid") {
+  if (view.mode === "grid") {
     return (
       <div className="min-h-screen bg-[#f2f0ed]">
-        {/* Header */}
-        <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-5">
+        <div className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-5 bg-[#f2f0ed]/80 backdrop-blur-sm">
           <button
-            onClick={() => setView("cylinder")}
-            className="text-sm text-neutral-500 hover:text-black transition-colors tracking-wide"
+            onClick={() => setView({ mode: "cylinder" })}
+            className="text-sm text-neutral-500 hover:text-black transition-colors"
           >
             ← Back
           </button>
           <h1 className="text-sm tracking-[0.25em] text-neutral-400 uppercase">
-            Our Orbit
+            All Images
           </h1>
-          <span className="text-sm text-neutral-400">
-            {PHOTOS.length} photos
-          </span>
+          <span className="text-sm text-neutral-400">{PHOTOS.length}</span>
         </div>
-
-        {/* Grid */}
         <div className="pt-20 pb-16 px-4 sm:px-8 md:px-16">
           <div className="columns-2 sm:columns-3 md:columns-4 gap-3 sm:gap-4">
             {PHOTOS.map((src, i) => (
               <div key={i} className="mb-3 sm:mb-4 break-inside-avoid">
-                <img
-                  src={src}
-                  alt={`Photo ${i + 1}`}
-                  loading="lazy"
-                  className="w-full rounded-sm shadow-sm hover:shadow-md transition-shadow duration-300"
-                />
+                <button onClick={() => setView({ mode: "detail", index: i })} className="w-full">
+                  <img
+                    src={src}
+                    alt={`Photo ${i + 1}`}
+                    loading="lazy"
+                    className="w-full rounded-sm shadow-sm hover:shadow-md transition-shadow duration-300"
+                  />
+                </button>
               </div>
             ))}
           </div>
@@ -290,26 +301,53 @@ export default function Home() {
     <div className="relative w-screen h-screen overflow-hidden bg-[#f2f0ed]">
       <div ref={containerRef} className="w-full h-full" />
 
-      {/* Top center: site name */}
+      {/* Top: site name */}
       <div className="absolute top-5 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
         <h1 className="text-sm tracking-[0.3em] text-neutral-400 uppercase select-none">
           Our Orbit
         </h1>
       </div>
 
-      {/* Center sphere label (CSS overlay, synced with Three.js sphere) */}
+      {/* Center: black sphere (CSS) */}
       <div className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none">
-        <div className="text-white text-xl font-light tracking-widest select-none">
-          Enter
-        </div>
+        <button
+          onClick={() => setView({ mode: "grid" })}
+          className="pointer-events-auto w-28 h-28 sm:w-36 sm:h-36 rounded-full bg-[#111] flex items-center justify-center shadow-2xl hover:scale-105 transition-transform duration-300 cursor-pointer"
+        >
+          <span className="text-white text-base sm:text-lg font-light tracking-[0.15em]">
+            Enter
+          </span>
+        </button>
       </div>
 
-      {/* Bottom: about link */}
-      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10">
+      {/* Bottom */}
+      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
         <span className="text-xs tracking-[0.2em] text-neutral-400 uppercase select-none">
           A & M
         </span>
       </div>
     </div>
   );
+}
+
+// Keyboard navigation for detail view
+function KeyboardNav({
+  onPrev,
+  onNext,
+  onClose,
+}: {
+  onPrev: () => void;
+  onNext: () => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "ArrowLeft" || e.key === "ArrowUp") onPrev();
+      else if (e.key === "ArrowRight" || e.key === "ArrowDown") onNext();
+      else if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onPrev, onNext, onClose]);
+  return null;
 }
