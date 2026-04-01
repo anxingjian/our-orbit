@@ -1,63 +1,121 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 
 const PHOTO_COUNT = 25;
 const PHOTOS = Array.from({ length: PHOTO_COUNT }, (_, i) =>
   `/photos/${String(i + 1).padStart(2, "0")}.jpg`
 );
 
-interface PhotoLayout {
-  x: number; // % from left
-  y: number; // px from top
-  rotation: number; // degrees
+interface PhotoPlacement {
+  x: number;
+  y: number;
+  rotation: number;
   scale: number;
-  zIndex: number;
+  width: number;
+  height: number;
 }
 
-function generateLayouts(count: number): PhotoLayout[] {
-  // Seed-based random for consistent layout across renders
-  let seed = 42;
-  const rand = () => {
-    seed = (seed * 16807 + 0) % 2147483647;
-    return seed / 2147483647;
+function seededRandom(seed: number) {
+  let s = seed;
+  return () => {
+    s = (s * 16807 + 0) % 2147483647;
+    return s / 2147483647;
   };
+}
 
-  const layouts: PhotoLayout[] = [];
-  const cols = 4;
-  const rowHeight = 420;
+function generatePlacements(count: number): PhotoPlacement[] {
+  const rand = seededRandom(42);
+  const placements: PhotoPlacement[] = [];
+
+  // Spread photos across a large canvas area
+  const canvasW = 4000;
+  const canvasH = 3200;
+  const cols = 5;
+  const rows = Math.ceil(count / cols);
+  const cellW = canvasW / cols;
+  const cellH = canvasH / rows;
 
   for (let i = 0; i < count; i++) {
     const row = Math.floor(i / cols);
     const col = i % cols;
 
-    // Base grid position with randomness
-    const baseX = (col / cols) * 80 + 5; // 5-85% range
-    const baseY = row * rowHeight + 80;
+    const baseX = col * cellW + cellW * 0.15;
+    const baseY = row * cellH + cellH * 0.15;
 
-    layouts.push({
-      x: baseX + (rand() - 0.5) * 15,
-      y: baseY + (rand() - 0.5) * 80,
-      rotation: (rand() - 0.5) * 12, // -6 to 6 degrees
-      scale: 0.85 + rand() * 0.3,
-      zIndex: Math.floor(rand() * 10),
+    const w = 220 + rand() * 120; // 220-340
+    const h = w * (0.65 + rand() * 0.5); // varying aspect ratios
+
+    placements.push({
+      x: baseX + (rand() - 0.5) * cellW * 0.5,
+      y: baseY + (rand() - 0.5) * cellH * 0.4,
+      rotation: (rand() - 0.5) * 8,
+      scale: 0.9 + rand() * 0.2,
+      width: w,
+      height: h,
     });
   }
-  return layouts;
+  return placements;
 }
 
 export default function Home() {
   const [selected, setSelected] = useState<number | null>(null);
-  const [hoveredZ, setHoveredZ] = useState<number | null>(null);
-  const layouts = useMemo(() => generateLayouts(PHOTO_COUNT), []);
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+  const placements = useMemo(() => generatePlacements(PHOTO_COUNT), []);
 
-  const totalHeight = useMemo(() => {
-    const maxY = Math.max(...layouts.map((l) => l.y));
-    return maxY + 500;
-  }, [layouts]);
+  // Canvas drag state
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
+  const didDrag = useRef(false);
+
+  // Center the canvas on mount
+  useEffect(() => {
+    if (containerRef.current) {
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      // Center on middle of the photo field
+      setOffset({
+        x: vw / 2 - 2000,
+        y: vh / 2 - 1600,
+      });
+    }
+  }, []);
+
+  const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    if (e.button !== 0) return;
+    setIsDragging(true);
+    didDrag.current = false;
+    dragStart.current = {
+      x: e.clientX,
+      y: e.clientY,
+      ox: offset.x,
+      oy: offset.y,
+    };
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+  }, [offset]);
+
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!isDragging) return;
+    const dx = e.clientX - dragStart.current.x;
+    const dy = e.clientY - dragStart.current.y;
+    if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDrag.current = true;
+    setOffset({
+      x: dragStart.current.ox + dx,
+      y: dragStart.current.oy + dy,
+    });
+  }, [isDragging]);
+
+  const handlePointerUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-[#f0ebe0] relative" style={{ cursor: "default" }}>
+    <div
+      className="fixed inset-0 overflow-hidden bg-[#f0ebe0]"
+      style={{ cursor: isDragging ? "grabbing" : "grab" }}
+    >
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center py-6 pointer-events-none">
         <h1 className="text-sm tracking-[0.4em] text-neutral-400 uppercase select-none font-light">
@@ -65,40 +123,57 @@ export default function Home() {
         </h1>
       </header>
 
-      {/* Scattered photos */}
-      <div className="relative" style={{ minHeight: totalHeight }}>
-        {PHOTOS.map((src, i) => {
-          const l = layouts[i];
-          const isHovered = hoveredZ === i;
-          return (
-            <div
-              key={i}
-              className="absolute transition-all duration-500 ease-out"
-              style={{
-                left: `${l.x}%`,
-                top: l.y,
-                transform: `rotate(${isHovered ? 0 : l.rotation}deg) scale(${isHovered ? 1.08 : l.scale})`,
-                zIndex: isHovered ? 100 : l.zIndex,
-                filter: isHovered
-                  ? "drop-shadow(0 20px 40px rgba(0,0,0,0.2))"
-                  : "drop-shadow(0 4px 12px rgba(0,0,0,0.1))",
-              }}
-              onMouseEnter={() => setHoveredZ(i)}
-              onMouseLeave={() => setHoveredZ(null)}
-              onClick={() => setSelected(i)}
-            >
-              <div className="bg-white p-2 sm:p-3 rounded-sm cursor-pointer">
-                <img
-                  src={src}
-                  alt={`Photo ${i + 1}`}
-                  loading="lazy"
-                  className="w-44 sm:w-56 md:w-64 h-auto block"
-                  draggable={false}
-                />
+      {/* Infinite canvas */}
+      <div
+        ref={containerRef}
+        className="w-full h-full select-none"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+      >
+        <div
+          style={{
+            transform: `translate(${offset.x}px, ${offset.y}px)`,
+            willChange: "transform",
+          }}
+        >
+          {PHOTOS.map((src, i) => {
+            const p = placements[i];
+            const isHovered = hoveredIdx === i;
+            return (
+              <div
+                key={i}
+                className="absolute transition-all duration-500 ease-out"
+                style={{
+                  left: p.x,
+                  top: p.y,
+                  transform: `rotate(${isHovered ? 0 : p.rotation}deg) scale(${isHovered ? 1.06 : p.scale})`,
+                  zIndex: isHovered ? 100 : 1,
+                  filter: isHovered
+                    ? "drop-shadow(0 24px 48px rgba(0,0,0,0.2))"
+                    : "drop-shadow(0 4px 16px rgba(0,0,0,0.08))",
+                }}
+                onMouseEnter={() => setHoveredIdx(i)}
+                onMouseLeave={() => setHoveredIdx(null)}
+                onClick={() => {
+                  if (!didDrag.current) setSelected(i);
+                }}
+              >
+                <div className="bg-white p-2 rounded-sm" style={{ width: p.width }}>
+                  <img
+                    src={src}
+                    alt={`Photo ${i + 1}`}
+                    loading="lazy"
+                    className="w-full h-auto block"
+                    style={{ height: p.height, objectFit: "cover" }}
+                    draggable={false}
+                  />
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       {/* Footer */}
@@ -153,7 +228,6 @@ function Lightbox({
       className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex"
       onClick={onClose}
     >
-      {/* Main image */}
       <div
         className="flex-1 flex items-center justify-center p-6 sm:p-12"
         onClick={(e) => e.stopPropagation()}
@@ -165,7 +239,6 @@ function Lightbox({
         />
       </div>
 
-      {/* Right sidebar carousel */}
       <div
         className="w-20 sm:w-24 flex flex-col items-center py-6 gap-2 overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
@@ -190,7 +263,6 @@ function Lightbox({
         ))}
       </div>
 
-      {/* Close */}
       <button
         onClick={onClose}
         className="absolute top-5 left-6 text-white/60 hover:text-white text-2xl transition-colors"
@@ -198,7 +270,6 @@ function Lightbox({
         ✕
       </button>
 
-      {/* Nav arrows */}
       <button
         onClick={(e) => {
           e.stopPropagation();
