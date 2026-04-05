@@ -14,6 +14,8 @@ interface PhotoPlacement {
   scale: number;
   width: number;
   height: number;
+  zBase: number;
+  tint: number; // slight yellowing variance
 }
 
 function seededRandom(seed: number) {
@@ -28,13 +30,20 @@ function generatePlacements(count: number): PhotoPlacement[] {
   const rand = seededRandom(42);
   const placements: PhotoPlacement[] = [];
 
-  // Spread photos across a large canvas area
-  const canvasW = 4000;
-  const canvasH = 3200;
+  const canvasW = 4200;
+  const canvasH = 3400;
   const cols = 5;
   const rows = Math.ceil(count / cols);
   const cellW = canvasW / cols;
   const cellH = canvasH / rows;
+
+  // Pre-assign z-base so some photos naturally stack over neighbors
+  const zBases = Array.from({ length: count }, (_, i) => i);
+  // Shuffle z slightly: swap some adjacent pairs to create natural overlaps
+  for (let i = 0; i < 8; i++) {
+    const idx = Math.floor(rand() * (count - 1));
+    [zBases[idx], zBases[idx + 1]] = [zBases[idx + 1], zBases[idx]];
+  }
 
   for (let i = 0; i < count; i++) {
     const row = Math.floor(i / cols);
@@ -43,19 +52,40 @@ function generatePlacements(count: number): PhotoPlacement[] {
     const baseX = col * cellW + cellW * 0.15;
     const baseY = row * cellH + cellH * 0.15;
 
-    const w = 220 + rand() * 120; // 220-340
-    const h = w * (0.65 + rand() * 0.5); // varying aspect ratios
+    // Width range 180–500px, more variance
+    const w = 180 + rand() * 320;
+    // Aspect ratio 3:2 to 4:3 range (landscape), occasional portrait
+    const isPortrait = rand() < 0.2;
+    const h = isPortrait ? w * (1.2 + rand() * 0.3) : w * (0.62 + rand() * 0.28);
+
+    // Slightly larger positional jitter for looser feel
+    const jitterX = (rand() - 0.5) * cellW * 0.55;
+    const jitterY = (rand() - 0.5) * cellH * 0.45;
 
     placements.push({
-      x: baseX + (rand() - 0.5) * cellW * 0.5,
-      y: baseY + (rand() - 0.5) * cellH * 0.4,
-      rotation: (rand() - 0.5) * 8,
-      scale: 0.9 + rand() * 0.2,
+      x: baseX + jitterX,
+      y: baseY + jitterY,
+      rotation: (rand() - 0.5) * 10,
+      scale: 0.92 + rand() * 0.16,
       width: w,
       height: h,
+      zBase: zBases[i],
+      tint: rand(), // 0–1, used for subtle yellowing variation
     });
   }
   return placements;
+}
+
+// Shadow depth by stacking position
+function getShadow(zBase: number, isHovered: boolean, count: number): string {
+  if (isHovered) {
+    return "drop-shadow(0 28px 56px rgba(0,0,0,0.28)) drop-shadow(0 8px 16px rgba(0,0,0,0.12))";
+  }
+  const depth = zBase / count; // 0 = bottom, 1 = top
+  const blur = 8 + depth * 24; // 8–32px
+  const spread = 4 + depth * 12; // 4–16px  
+  const alpha = 0.08 + depth * 0.1; // 0.08–0.18
+  return `drop-shadow(0 ${Math.round(4 + depth * 12)}px ${Math.round(blur)}px rgba(0,0,0,${alpha.toFixed(2)})) drop-shadow(0 2px 4px rgba(0,0,0,0.06))`;
 }
 
 export default function Home() {
@@ -63,22 +93,19 @@ export default function Home() {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
   const placements = useMemo(() => generatePlacements(PHOTO_COUNT), []);
 
-  // Canvas drag state
   const containerRef = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
   const didDrag = useRef(false);
 
-  // Center the canvas on mount
   useEffect(() => {
     if (containerRef.current) {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      // Center on middle of the photo field
       setOffset({
-        x: vw / 2 - 2000,
-        y: vh / 2 - 1600,
+        x: vw / 2 - 2100,
+        y: vh / 2 - 1700,
       });
     }
   }, []);
@@ -116,6 +143,17 @@ export default function Home() {
       className="fixed inset-0 overflow-hidden bg-[#f0ebe0]"
       style={{ cursor: isDragging ? "grabbing" : "grab" }}
     >
+      {/* Subtle noise texture overlay */}
+      <div
+        className="fixed inset-0 pointer-events-none z-10"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E")`,
+          backgroundSize: "200px 200px",
+          opacity: 0.35,
+          mixBlendMode: "multiply",
+        }}
+      />
+
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-center py-6 pointer-events-none">
         <h1 className="text-sm tracking-[0.4em] text-neutral-400 uppercase select-none font-light">
@@ -141,6 +179,18 @@ export default function Home() {
           {PHOTOS.map((src, i) => {
             const p = placements[i];
             const isHovered = hoveredIdx === i;
+
+            // Tint: base is warm white, slight yellowing per photo
+            const r = Math.round(255 - p.tint * 8);
+            const g = Math.round(252 - p.tint * 10);
+            const b = Math.round(242 - p.tint * 18);
+            const paperColor = `rgb(${r},${g},${b})`;
+
+            // Polaroid proportions: equal border on 3 sides, larger bottom
+            const sidePad = Math.round(p.width * 0.045);
+            const topPad = sidePad;
+            const bottomPad = Math.round(p.width * 0.14);
+
             return (
               <div
                 key={i}
@@ -148,11 +198,10 @@ export default function Home() {
                 style={{
                   left: p.x,
                   top: p.y,
-                  transform: `rotate(${isHovered ? 0 : p.rotation}deg) scale(${isHovered ? 1.06 : p.scale})`,
-                  zIndex: isHovered ? 100 : 1,
-                  filter: isHovered
-                    ? "drop-shadow(0 24px 48px rgba(0,0,0,0.2))"
-                    : "drop-shadow(0 4px 16px rgba(0,0,0,0.08))",
+                  transform: `rotate(${isHovered ? p.rotation * 0.3 : p.rotation}deg) scale(${isHovered ? 1.05 : p.scale})`,
+                  zIndex: isHovered ? 200 : p.zBase + 1,
+                  filter: getShadow(p.zBase, isHovered, PHOTO_COUNT),
+                  willChange: "transform, filter",
                 }}
                 onMouseEnter={() => setHoveredIdx(i)}
                 onMouseLeave={() => setHoveredIdx(null)}
@@ -160,13 +209,45 @@ export default function Home() {
                   if (!didDrag.current) setSelected(i);
                 }}
               >
-                <div className="bg-white p-2 rounded-sm" style={{ width: p.width }}>
+                {/* Polaroid frame */}
+                <div
+                  style={{
+                    background: paperColor,
+                    paddingLeft: sidePad,
+                    paddingRight: sidePad,
+                    paddingTop: topPad,
+                    paddingBottom: bottomPad,
+                    width: p.width,
+                    borderRadius: 2,
+                    // Very subtle paper texture via inner shadow
+                    boxShadow: `inset 0 0 0 1px rgba(0,0,0,0.04), inset 0 1px 2px rgba(255,255,255,0.6)`,
+                    position: "relative",
+                  }}
+                >
+                  {/* Paper grain */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)' opacity='0.06'/%3E%3C/svg%3E")`,
+                      backgroundSize: "100px 100px",
+                      opacity: 0.5,
+                      mixBlendMode: "multiply",
+                      pointerEvents: "none",
+                      borderRadius: 2,
+                    }}
+                  />
                   <img
                     src={src}
                     alt={`Photo ${i + 1}`}
                     loading="lazy"
-                    className="w-full h-auto block"
-                    style={{ height: p.height, objectFit: "cover" }}
+                    className="block"
+                    style={{
+                      width: "100%",
+                      height: p.height,
+                      objectFit: "cover",
+                      display: "block",
+                    }}
                     draggable={false}
                   />
                 </div>
@@ -225,66 +306,114 @@ function Lightbox({
 
   return (
     <div
-      className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex"
+      className="fixed inset-0 z-[200] flex items-center justify-center"
+      style={{ background: "rgba(10,9,8,0.92)", backdropFilter: "blur(6px)" }}
       onClick={onClose}
     >
+      {/* Main image */}
       <div
-        className="flex-1 flex items-center justify-center p-6 sm:p-12"
+        className="relative flex items-center justify-center"
+        style={{ width: "100%", height: "100%" }}
         onClick={(e) => e.stopPropagation()}
       >
         <img
           src={photos[index]}
           alt={`Photo ${index + 1}`}
-          className="max-h-[88vh] max-w-[calc(100%-120px)] object-contain rounded-sm"
+          style={{
+            maxHeight: "88vh",
+            maxWidth: "88vw",
+            objectFit: "contain",
+            borderRadius: 2,
+            boxShadow: "0 40px 80px rgba(0,0,0,0.6)",
+          }}
         />
+
+        {/* Counter */}
+        <div
+          style={{
+            position: "absolute",
+            bottom: "2rem",
+            left: "50%",
+            transform: "translateX(-50%)",
+            fontFamily: "monospace",
+            fontSize: "0.625rem",
+            letterSpacing: "0.3em",
+            color: "rgba(255,255,255,0.3)",
+            userSelect: "none",
+          }}
+        >
+          {String(index + 1).padStart(2, "0")} / {String(photos.length).padStart(2, "0")}
+        </div>
       </div>
 
-      <div
-        className="w-20 sm:w-24 flex flex-col items-center py-6 gap-2 overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
-        style={{ scrollbarWidth: "none" }}
-      >
-        {photos.map((src, i) => (
-          <button
-            key={i}
-            onClick={() => onChange(i)}
-            className={`w-14 h-14 sm:w-16 sm:h-16 rounded overflow-hidden flex-shrink-0 border-2 transition-all duration-200 ${
-              i === index
-                ? "border-white opacity-100"
-                : "border-transparent opacity-40 hover:opacity-70"
-            }`}
-          >
-            <img
-              src={src}
-              alt={`Thumb ${i + 1}`}
-              className="w-full h-full object-cover"
-            />
-          </button>
-        ))}
-      </div>
-
+      {/* Close */}
       <button
         onClick={onClose}
-        className="absolute top-5 left-6 text-white/60 hover:text-white text-2xl transition-colors"
+        style={{
+          position: "absolute",
+          top: "1.5rem",
+          left: "1.5rem",
+          color: "rgba(255,255,255,0.4)",
+          background: "none",
+          border: "none",
+          fontSize: "1.25rem",
+          cursor: "pointer",
+          lineHeight: 1,
+          padding: "0.5rem",
+          transition: "color 0.2s",
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.9)")}
+        onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.4)")}
       >
         ✕
       </button>
 
+      {/* Prev */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           onChange((index - 1 + photos.length) % photos.length);
         }}
-        className="absolute left-4 top-1/2 -translate-y-1/2 text-white/40 hover:text-white text-3xl transition-colors"
+        style={{
+          position: "absolute",
+          left: "1.5rem",
+          top: "50%",
+          transform: "translateY(-50%)",
+          color: "rgba(255,255,255,0.3)",
+          background: "none",
+          border: "none",
+          fontSize: "2rem",
+          cursor: "pointer",
+          padding: "1rem 0.75rem",
+          transition: "color 0.2s",
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.8)")}
+        onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.3)")}
       >
         ‹
       </button>
+
+      {/* Next */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           onChange((index + 1) % photos.length);
         }}
-        className="absolute right-28 top-1/2 -translate-y-1/2 text-white/40 hover:text-white text-3xl transition-colors"
+        style={{
+          position: "absolute",
+          right: "1.5rem",
+          top: "50%",
+          transform: "translateY(-50%)",
+          color: "rgba(255,255,255,0.3)",
+          background: "none",
+          border: "none",
+          fontSize: "2rem",
+          cursor: "pointer",
+          padding: "1rem 0.75rem",
+          transition: "color 0.2s",
+        }}
+        onMouseEnter={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.8)")}
+        onMouseLeave={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.3)")}
       >
         ›
       </button>
