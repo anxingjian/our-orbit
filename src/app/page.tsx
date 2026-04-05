@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 const PHOTO_COUNT = 25;
 const PHOTOS = Array.from({ length: PHOTO_COUNT }, (_, i) =>
@@ -15,7 +15,7 @@ interface PhotoPlacement {
   width: number;
   height: number;
   zBase: number;
-  tint: number; // slight yellowing variance
+  tint: number;
 }
 
 function seededRandom(seed: number) {
@@ -26,20 +26,17 @@ function seededRandom(seed: number) {
   };
 }
 
-// Generate placements scaled to viewport
-function generatePlacements(count: number, isMobile: boolean): PhotoPlacement[] {
+function generatePlacements(count: number, mobile: boolean): PhotoPlacement[] {
   const rand = seededRandom(42);
   const placements: PhotoPlacement[] = [];
 
-  // Tighter canvas on mobile so photos are reachable by dragging
-  const canvasW = isMobile ? 1400 : 4200;
-  const canvasH = isMobile ? 2200 : 3400;
-  const cols = isMobile ? 3 : 5;
+  const canvasW = mobile ? 1200 : 4200;
+  const canvasH = mobile ? 1800 : 3400;
+  const cols = mobile ? 3 : 5;
   const rows = Math.ceil(count / cols);
   const cellW = canvasW / cols;
   const cellH = canvasH / rows;
 
-  // Pre-assign z-base so some photos naturally stack over neighbors
   const zBases = Array.from({ length: count }, (_, i) => i);
   for (let i = 0; i < 8; i++) {
     const idx = Math.floor(rand() * (count - 1));
@@ -53,9 +50,8 @@ function generatePlacements(count: number, isMobile: boolean): PhotoPlacement[] 
     const baseX = col * cellW + cellW * 0.15;
     const baseY = row * cellH + cellH * 0.15;
 
-    // Smaller photos on mobile
-    const minW = isMobile ? 100 : 180;
-    const maxW = isMobile ? 260 : 500;
+    const minW = mobile ? 90 : 180;
+    const maxW = mobile ? 200 : 500;
     const w = minW + rand() * (maxW - minW);
     const isPortrait = rand() < 0.2;
     const h = isPortrait ? w * (1.2 + rand() * 0.3) : w * (0.62 + rand() * 0.28);
@@ -77,61 +73,55 @@ function generatePlacements(count: number, isMobile: boolean): PhotoPlacement[] 
   return placements;
 }
 
-// Shadow depth by stacking position
 function getShadow(zBase: number, isHovered: boolean, count: number): string {
   if (isHovered) {
     return "drop-shadow(0 28px 56px rgba(0,0,0,0.28)) drop-shadow(0 8px 16px rgba(0,0,0,0.12))";
   }
-  const depth = zBase / count; // 0 = bottom, 1 = top
-  const blur = 8 + depth * 24; // 8–32px
-  const spread = 4 + depth * 12; // 4–16px  
-  const alpha = 0.08 + depth * 0.1; // 0.08–0.18
+  const depth = zBase / count;
+  const blur = 8 + depth * 24;
+  const alpha = 0.08 + depth * 0.1;
   return `drop-shadow(0 ${Math.round(4 + depth * 12)}px ${Math.round(blur)}px rgba(0,0,0,${alpha.toFixed(2)})) drop-shadow(0 2px 4px rgba(0,0,0,0.06))`;
 }
 
 export default function Home() {
   const [selected, setSelected] = useState<number | null>(null);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
-  const [isMobile, setIsMobile] = useState(false);
-  const placements = useMemo(
-    () => generatePlacements(PHOTO_COUNT, isMobile),
-    [isMobile]
-  );
-
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [ready, setReady] = useState(false);
+  const [placements, setPlacements] = useState<PhotoPlacement[]>([]);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
   const didDrag = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const offsetRef = useRef(offset);
+  offsetRef.current = offset;
 
-  // On mount: detect mobile, generate placements, and center — all in one pass
-  // to avoid the isMobile→placements→centering cascade that causes a flash
+  // Single init: detect mobile, generate placements, compute centered offset, then reveal
   useEffect(() => {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const mobile = vw < 768;
 
-    // Update isMobile state (for lightbox and other UI)
-    setIsMobile(mobile);
+    const p = generatePlacements(PHOTO_COUNT, mobile);
+    setPlacements(p);
 
-    // Generate placements with the correct isMobile value immediately
-    const freshPlacements = generatePlacements(PHOTO_COUNT, mobile);
-
-    // Center on the bounding box of fresh placements
+    // Center on bounding box of photos
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    freshPlacements.forEach((p) => {
-      minX = Math.min(minX, p.x);
-      minY = Math.min(minY, p.y);
-      maxX = Math.max(maxX, p.x + p.width);
-      maxY = Math.max(maxY, p.y + p.height);
+    p.forEach((ph) => {
+      minX = Math.min(minX, ph.x);
+      minY = Math.min(minY, ph.y);
+      maxX = Math.max(maxX, ph.x + ph.width);
+      maxY = Math.max(maxY, ph.y + ph.height);
     });
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
 
-    setOffset({
-      x: vw / 2 - centerX,
-      y: vh / 2 - centerY,
-    });
+    const newOffset = { x: vw / 2 - cx, y: vh / 2 - cy };
+    setOffset(newOffset);
+    offsetRef.current = newOffset;
+
+    // Small delay to let state settle before showing (avoids flash)
+    requestAnimationFrame(() => setReady(true));
   }, []);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -141,21 +131,23 @@ export default function Home() {
     dragStart.current = {
       x: e.clientX,
       y: e.clientY,
-      ox: offset.x,
-      oy: offset.y,
+      ox: offsetRef.current.x,
+      oy: offsetRef.current.y,
     };
     (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
-  }, [offset]);
+  }, []);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDragging) return;
     const dx = e.clientX - dragStart.current.x;
     const dy = e.clientY - dragStart.current.y;
     if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDrag.current = true;
-    setOffset({
+    const newOff = {
       x: dragStart.current.ox + dx,
       y: dragStart.current.oy + dy,
-    });
+    };
+    setOffset(newOff);
+    offsetRef.current = newOff;
   }, [isDragging]);
 
   const handlePointerUp = useCallback(() => {
@@ -165,9 +157,13 @@ export default function Home() {
   return (
     <div
       className="fixed inset-0 overflow-hidden bg-[#f0ebe0]"
-      style={{ cursor: isDragging ? "grabbing" : "grab" }}
+      style={{
+        cursor: isDragging ? "grabbing" : "grab",
+        opacity: ready ? 1 : 0,
+        transition: "opacity 0.4s ease",
+      }}
     >
-      {/* Subtle noise texture overlay */}
+      {/* Noise texture overlay */}
       <div
         className="fixed inset-0 pointer-events-none z-10"
         style={{
@@ -200,17 +196,16 @@ export default function Home() {
             willChange: "transform",
           }}
         >
-          {PHOTOS.map((src, i) => {
-            const p = placements[i];
+          {placements.map((p, i) => {
             const isHovered = hoveredIdx === i;
+            const src = PHOTOS[i];
+            if (!src) return null;
 
-            // Tint: base is warm white, slight yellowing per photo
             const r = Math.round(255 - p.tint * 8);
             const g = Math.round(252 - p.tint * 10);
             const b = Math.round(242 - p.tint * 18);
             const paperColor = `rgb(${r},${g},${b})`;
 
-            // Polaroid proportions: equal border on 3 sides, larger bottom
             const sidePad = Math.round(p.width * 0.045);
             const topPad = sidePad;
             const bottomPad = Math.round(p.width * 0.14);
@@ -233,7 +228,6 @@ export default function Home() {
                   if (!didDrag.current) setSelected(i);
                 }}
               >
-                {/* Polaroid frame */}
                 <div
                   style={{
                     background: paperColor,
@@ -243,12 +237,10 @@ export default function Home() {
                     paddingBottom: bottomPad,
                     width: p.width,
                     borderRadius: 2,
-                    // Very subtle paper texture via inner shadow
                     boxShadow: `inset 0 0 0 1px rgba(0,0,0,0.04), inset 0 1px 2px rgba(255,255,255,0.6)`,
                     position: "relative",
                   }}
                 >
-                  {/* Paper grain */}
                   <div
                     style={{
                       position: "absolute",
@@ -312,6 +304,20 @@ function Lightbox({
   onClose: () => void;
   onChange: (i: number) => void;
 }) {
+  // Swipe support for mobile
+  const touchStart = useRef({ x: 0, y: 0 });
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  }, []);
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const dx = e.changedTouches[0].clientX - touchStart.current.x;
+    const dy = e.changedTouches[0].clientY - touchStart.current.y;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+      if (dx < 0) onChange((index + 1) % photos.length);
+      else onChange((index - 1 + photos.length) % photos.length);
+    }
+  }, [index, onChange, photos.length]);
+
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -333,8 +339,9 @@ function Lightbox({
       className="fixed inset-0 z-[200] flex items-center justify-center"
       style={{ background: "rgba(10,9,8,0.92)", backdropFilter: "blur(6px)" }}
       onClick={onClose}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
-      {/* Main image */}
       <div
         className="relative flex items-center justify-center"
         style={{ width: "100%", height: "100%" }}
@@ -352,7 +359,6 @@ function Lightbox({
           }}
         />
 
-        {/* Counter */}
         <div
           style={{
             position: "absolute",
@@ -370,7 +376,6 @@ function Lightbox({
         </div>
       </div>
 
-      {/* Close */}
       <button
         onClick={onClose}
         style={{
@@ -392,7 +397,6 @@ function Lightbox({
         ✕
       </button>
 
-      {/* Prev */}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -417,7 +421,6 @@ function Lightbox({
         ‹
       </button>
 
-      {/* Next */}
       <button
         onClick={(e) => {
           e.stopPropagation();
