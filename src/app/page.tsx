@@ -26,20 +26,21 @@ function seededRandom(seed: number) {
   };
 }
 
-function generatePlacements(count: number): PhotoPlacement[] {
+// Generate placements scaled to viewport
+function generatePlacements(count: number, isMobile: boolean): PhotoPlacement[] {
   const rand = seededRandom(42);
   const placements: PhotoPlacement[] = [];
 
-  const canvasW = 4200;
-  const canvasH = 3400;
-  const cols = 5;
+  // Tighter canvas on mobile so photos are reachable by dragging
+  const canvasW = isMobile ? 1400 : 4200;
+  const canvasH = isMobile ? 2200 : 3400;
+  const cols = isMobile ? 3 : 5;
   const rows = Math.ceil(count / cols);
   const cellW = canvasW / cols;
   const cellH = canvasH / rows;
 
   // Pre-assign z-base so some photos naturally stack over neighbors
   const zBases = Array.from({ length: count }, (_, i) => i);
-  // Shuffle z slightly: swap some adjacent pairs to create natural overlaps
   for (let i = 0; i < 8; i++) {
     const idx = Math.floor(rand() * (count - 1));
     [zBases[idx], zBases[idx + 1]] = [zBases[idx + 1], zBases[idx]];
@@ -52,13 +53,13 @@ function generatePlacements(count: number): PhotoPlacement[] {
     const baseX = col * cellW + cellW * 0.15;
     const baseY = row * cellH + cellH * 0.15;
 
-    // Width range 180–500px, more variance
-    const w = 180 + rand() * 320;
-    // Aspect ratio 3:2 to 4:3 range (landscape), occasional portrait
+    // Smaller photos on mobile
+    const minW = isMobile ? 100 : 180;
+    const maxW = isMobile ? 260 : 500;
+    const w = minW + rand() * (maxW - minW);
     const isPortrait = rand() < 0.2;
     const h = isPortrait ? w * (1.2 + rand() * 0.3) : w * (0.62 + rand() * 0.28);
 
-    // Slightly larger positional jitter for looser feel
     const jitterX = (rand() - 0.5) * cellW * 0.55;
     const jitterY = (rand() - 0.5) * cellH * 0.45;
 
@@ -70,7 +71,7 @@ function generatePlacements(count: number): PhotoPlacement[] {
       width: w,
       height: h,
       zBase: zBases[i],
-      tint: rand(), // 0–1, used for subtle yellowing variation
+      tint: rand(),
     });
   }
   return placements;
@@ -91,7 +92,11 @@ function getShadow(zBase: number, isHovered: boolean, count: number): string {
 export default function Home() {
   const [selected, setSelected] = useState<number | null>(null);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
-  const placements = useMemo(() => generatePlacements(PHOTO_COUNT), []);
+  const [isMobile, setIsMobile] = useState(false);
+  const placements = useMemo(
+    () => generatePlacements(PHOTO_COUNT, isMobile),
+    [isMobile]
+  );
 
   const containerRef = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -100,15 +105,32 @@ export default function Home() {
   const didDrag = useRef(false);
 
   useEffect(() => {
-    if (containerRef.current) {
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      setOffset({
-        x: vw / 2 - 2100,
-        y: vh / 2 - 1700,
-      });
-    }
+    const mobile = window.innerWidth < 768;
+    setIsMobile(mobile);
   }, []);
+
+  // Re-center when placements or viewport changes
+  useEffect(() => {
+    if (placements.length === 0) return;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    // Compute bounding box of all photo centers
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    placements.forEach((p) => {
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x + p.width);
+      maxY = Math.max(maxY, p.y + p.height);
+    });
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    setOffset({
+      x: vw / 2 - centerX,
+      y: vh / 2 - centerY,
+    });
+  }, [placements]);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return;
