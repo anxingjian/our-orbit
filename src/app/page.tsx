@@ -104,20 +104,22 @@ export default function Home() {
   const dragStart = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
   const didDrag = useRef(false);
 
+  // On mount: detect mobile, generate placements, and center — all in one pass
+  // to avoid the isMobile→placements→centering cascade that causes a flash
   useEffect(() => {
-    const mobile = window.innerWidth < 768;
-    setIsMobile(mobile);
-  }, []);
-
-  // Re-center when placements or viewport changes
-  useEffect(() => {
-    if (placements.length === 0) return;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
+    const mobile = vw < 768;
 
-    // Compute bounding box of all photo centers
+    // Update isMobile state (for lightbox and other UI)
+    setIsMobile(mobile);
+
+    // Generate placements with the correct isMobile value immediately
+    const freshPlacements = generatePlacements(PHOTO_COUNT, mobile);
+
+    // Center on the bounding box of fresh placements
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    placements.forEach((p) => {
+    freshPlacements.forEach((p) => {
       minX = Math.min(minX, p.x);
       minY = Math.min(minY, p.y);
       maxX = Math.max(maxX, p.x + p.width);
@@ -130,7 +132,7 @@ export default function Home() {
       x: vw / 2 - centerX,
       y: vh / 2 - centerY,
     });
-  }, [placements]);
+  }, []);
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     if (e.button !== 0) return;
