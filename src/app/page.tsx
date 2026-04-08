@@ -105,16 +105,11 @@ export default function Home() {
     const p = generatePlacements(PHOTO_COUNT, mobile);
     setPlacements(p);
 
-    // Center on bounding box of photos
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    p.forEach((ph) => {
-      minX = Math.min(minX, ph.x);
-      minY = Math.min(minY, ph.y);
-      maxX = Math.max(maxX, ph.x + ph.width);
-      maxY = Math.max(maxY, ph.y + ph.height);
-    });
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
+    // Center on canvas geometric center (more stable than bounding box)
+    const canvasW = mobile ? 1200 : 4200;
+    const canvasH = mobile ? 1800 : 3400;
+    const cx = canvasW / 2;
+    const cy = canvasH / 2;
 
     const newOffset = { x: vw / 2 - cx, y: vh / 2 - cy };
     setOffset(newOffset);
