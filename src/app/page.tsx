@@ -105,11 +105,16 @@ export default function Home() {
     const p = generatePlacements(PHOTO_COUNT, mobile);
     setPlacements(p);
 
-    // Center on canvas geometric center (more stable than bounding box)
-    const canvasW = mobile ? 1200 : 4200;
-    const canvasH = mobile ? 1800 : 3400;
-    const cx = canvasW / 2;
-    const cy = canvasH / 2;
+    // Center on bounding box of photos
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    p.forEach((ph) => {
+      minX = Math.min(minX, ph.x);
+      minY = Math.min(minY, ph.y);
+      maxX = Math.max(maxX, ph.x + ph.width);
+      maxY = Math.max(maxY, ph.y + ph.height);
+    });
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
 
     const newOffset = { x: vw / 2 - cx, y: vh / 2 - cy };
     setOffset(newOffset);
@@ -154,6 +159,8 @@ export default function Home() {
       className="fixed inset-0 overflow-hidden bg-[#f0ebe0]"
       style={{
         cursor: isDragging ? "grabbing" : "grab",
+        opacity: ready ? 1 : 0,
+        transition: "opacity 0.4s ease",
       }}
     >
       {/* Noise texture overlay */}
@@ -187,8 +194,6 @@ export default function Home() {
           style={{
             transform: `translate(${offset.x}px, ${offset.y}px)`,
             willChange: "transform",
-            opacity: ready ? 1 : 0,
-            transition: "opacity 0.4s ease",
           }}
         >
           {placements.map((p, i) => {
@@ -270,16 +275,9 @@ export default function Home() {
 
       {/* Footer */}
       <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
-        {!ready && (
-          <span className="text-xs tracking-[0.2em] text-neutral-300 uppercase select-none opacity-60">
-            loading
-          </span>
-        )}
-        {ready && (
-          <span className="text-xs tracking-[0.2em] text-neutral-300 uppercase select-none">
-            A & M
-          </span>
-        )}
+        <span className="text-xs tracking-[0.2em] text-neutral-300 uppercase select-none">
+          A & M
+        </span>
       </div>
 
       {/* Lightbox */}
