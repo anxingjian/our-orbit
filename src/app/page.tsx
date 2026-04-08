@@ -30,8 +30,8 @@ function generatePlacements(count: number, mobile: boolean): PhotoPlacement[] {
   const rand = seededRandom(42);
   const placements: PhotoPlacement[] = [];
 
-  const canvasW = mobile ? 1200 : 4200;
-  const canvasH = mobile ? 1800 : 3400;
+  const canvasW = mobile ? 1200 : 2800;
+  const canvasH = mobile ? 1800 : 2200;
   const cols = mobile ? 3 : 5;
   const rows = Math.ceil(count / cols);
   const cellW = canvasW / cols;
