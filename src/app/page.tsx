@@ -256,7 +256,7 @@ export default function Home() {
                   <img
                     src={src}
                     alt={`Photo ${i + 1}`}
-                    loading="lazy"
+                    loading="eager"
                     className="block"
                     style={{
                       width: "100%",
