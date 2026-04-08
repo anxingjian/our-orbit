@@ -159,8 +159,6 @@ export default function Home() {
       className="fixed inset-0 overflow-hidden bg-[#f0ebe0]"
       style={{
         cursor: isDragging ? "grabbing" : "grab",
-        opacity: ready ? 1 : 0,
-        transition: "opacity 0.4s ease",
       }}
     >
       {/* Noise texture overlay */}
@@ -194,6 +192,8 @@ export default function Home() {
           style={{
             transform: `translate(${offset.x}px, ${offset.y}px)`,
             willChange: "transform",
+            opacity: ready ? 1 : 0,
+            transition: "opacity 0.4s ease",
           }}
         >
           {placements.map((p, i) => {
@@ -275,9 +275,16 @@ export default function Home() {
 
       {/* Footer */}
       <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-40 pointer-events-none">
-        <span className="text-xs tracking-[0.2em] text-neutral-300 uppercase select-none">
-          A & M
-        </span>
+        {!ready && (
+          <span className="text-xs tracking-[0.2em] text-neutral-300 uppercase select-none opacity-60">
+            loading
+          </span>
+        )}
+        {ready && (
+          <span className="text-xs tracking-[0.2em] text-neutral-300 uppercase select-none">
+            A & M
+          </span>
+        )}
       </div>
 
       {/* Lightbox */}
