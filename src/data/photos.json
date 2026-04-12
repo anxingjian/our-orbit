@@ -1,6 +1,6 @@
 [
   { "src": "/photos/01.jpg", "date": "2024-01-01", "width": 1600, "height": 1200, "title": "Lakeside" },
-  { "src": "/photos/02.jpg", "date": "2024-03-16", "width": 1600, "height": 1200, "title": "Getting Ready" },
+  { "src": "/photos/02.jpg", "date": "2024-03-16", "width": 1600, "height": 1200, "title": "Getting Ready", "description": "婚礼开始前的那段安静。" },
   { "src": "/photos/03.jpg", "date": "2025-10-05", "width": 1600, "height": 1066, "title": "Adobe Wall" },
   { "src": "/photos/04.jpg", "date": "2021-10-06", "width": 1600, "height": 900,  "title": "Winter Self-Portrait" },
   { "src": "/photos/05.jpg", "date": "2015-08-13", "width": 1600, "height": 1200, "title": "Film Camera Girl" },

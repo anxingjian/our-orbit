@@ -10,6 +10,7 @@ export interface Photo {
   width: number;
   height: number;
   title?: string;
+  description?: string;
 }
 
 function shouldShowDateLabel(photo: Photo, prevPhoto?: Photo): boolean {

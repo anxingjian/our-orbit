@@ -113,17 +113,30 @@ export default function PhotoDetail({
               />
             </div>
 
-            {/* 标题 — 时间 */}
-            <div style={{ marginTop: '20px', textAlign: 'center' }}>
+            {/* 标题 — 时间 + description */}
+            <div style={{ marginTop: '20px', textAlign: 'center', maxWidth: '480px' }}>
               <p style={{
                 fontFamily: 'var(--font-body)',
                 fontSize: '13px',
                 fontWeight: 400,
                 color: 'var(--color-text-secondary)',
                 letterSpacing: '0.04em',
+                marginBottom: photo.description ? '12px' : 0,
               }}>
                 {photo.title ? `${photo.title} — ${formatDateFull(photo.date)}` : formatDateFull(photo.date)}
               </p>
+              {photo.description && (
+                <p style={{
+                  fontFamily: 'var(--font-body)',
+                  fontSize: '13px',
+                  fontWeight: 400,
+                  color: 'var(--color-text-muted)',
+                  lineHeight: 1.7,
+                  letterSpacing: '0.01em',
+                }}>
+                  {photo.description}
+                </p>
+              )}
             </div>
           </motion.div>
 
