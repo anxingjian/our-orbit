@@ -2,8 +2,6 @@
 
 import { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import Image from 'next/image';
-
 export interface Photo {
   src: string;
   date: string;
@@ -78,13 +76,12 @@ function PhotoItem({ photo, prevPhoto }: PhotoItemProps) {
         style={{ padding: '0 16px', marginBottom: '80px' }}
       >
         <div style={{ borderRadius: '3px', overflow: 'hidden', lineHeight: 0 }}>
-          <Image
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src={photo.src}
             alt={photo.title || formatDate(photo.date)}
-            width={photo.width}
-            height={photo.height}
+            loading="lazy"
             style={{ width: '100%', height: 'auto', display: 'block' }}
-            sizes="(max-width: 768px) 100vw, 720px"
           />
         </div>
       </motion.div>
