@@ -6,7 +6,7 @@ import type { Photo } from '@/components/PhotoList';
 import PhotoDetail from '@/components/PhotoDetail';
 import MasonryGrid from '@/components/MasonryGrid';
 
-export default function SentenceLayout() {
+export default function BreathingLayout() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
 
   const photos = useMemo(() =>
@@ -21,16 +21,16 @@ export default function SentenceLayout() {
         fontFamily: 'var(--font-body)', fontSize: '12px',
         letterSpacing: '0.06em', color: 'var(--color-text-muted)',
       }}>
-        <a href="/demo/breathing" style={{ textDecoration: 'none', color: 'inherit' }}>Masonry A</a>
+        <a href="/demo/breathing" style={{ color: 'var(--color-text)', fontWeight: 500, textDecoration: 'none' }}>Masonry A</a>
         <a href="/demo/scattered" style={{ textDecoration: 'none', color: 'inherit' }}>Polaroid</a>
-        <a href="/demo/sentence" style={{ color: 'var(--color-text)', fontWeight: 500, textDecoration: 'none' }}>Sentence</a>
+        <a href="/demo/sentence" style={{ textDecoration: 'none', color: 'inherit' }}>Sentence</a>
         <a href="/" style={{ textDecoration: 'none', color: 'inherit', marginLeft: 'auto' }}>← 返回</a>
       </nav>
 
-      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         <MasonryGrid
           photos={photos}
-          cols={3}
+          cols={4}
           gap={7}
           onSelect={(_, i) => setActiveIndex(i)}
         />
