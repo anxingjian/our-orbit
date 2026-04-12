@@ -2,6 +2,8 @@
 
 import { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import PhotoDetail from './PhotoDetail';
+
 export interface Photo {
   src: string;
   date: string;
@@ -28,9 +30,10 @@ function formatDate(dateStr: string): string {
 interface PhotoItemProps {
   photo: Photo;
   prevPhoto?: Photo;
+  onClick: () => void;
 }
 
-function PhotoItem({ photo, prevPhoto }: PhotoItemProps) {
+function PhotoItem({ photo, prevPhoto, onClick }: PhotoItemProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState(false);
   const showLabel = shouldShowDateLabel(photo, prevPhoto);
@@ -53,7 +56,6 @@ function PhotoItem({ photo, prevPhoto }: PhotoItemProps) {
 
   return (
     <div ref={ref}>
-      {/* 月份标记 */}
       {showLabel && (
         <div style={{ padding: '0 16px', marginBottom: '16px', display: 'flex', justifyContent: 'flex-end' }}>
           <span style={{
@@ -68,20 +70,34 @@ function PhotoItem({ photo, prevPhoto }: PhotoItemProps) {
         </div>
       )}
 
-      {/* 照片 */}
       <motion.div
         initial={{ opacity: 0, y: 14 }}
         animate={visible ? { opacity: 1, y: 0 } : {}}
         transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
         style={{ padding: '0 16px', marginBottom: '80px' }}
       >
-        <div style={{ borderRadius: '3px', overflow: 'hidden', lineHeight: 0 }}>
+        <div
+          onClick={onClick}
+          style={{
+            borderRadius: '3px',
+            overflow: 'hidden',
+            lineHeight: 0,
+            cursor: 'pointer',
+          }}
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={photo.src}
             alt={photo.title || formatDate(photo.date)}
             loading="lazy"
-            style={{ width: '100%', height: 'auto', display: 'block' }}
+            style={{
+              width: '100%',
+              height: 'auto',
+              display: 'block',
+              transition: 'transform 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.015)')}
+            onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
           />
         </div>
       </motion.div>
@@ -98,11 +114,29 @@ export default function PhotoList({ photos }: PhotoListProps) {
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
   );
 
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+
   return (
-    <div style={{ maxWidth: '720px', margin: '0 auto', paddingTop: '80px', paddingBottom: '120px' }}>
-      {sorted.map((photo, i) => (
-        <PhotoItem key={photo.src} photo={photo} prevPhoto={sorted[i - 1]} />
-      ))}
-    </div>
+    <>
+      <div style={{ maxWidth: '720px', margin: '0 auto', paddingTop: '80px', paddingBottom: '120px' }}>
+        {sorted.map((photo, i) => (
+          <PhotoItem
+            key={photo.src}
+            photo={photo}
+            prevPhoto={sorted[i - 1]}
+            onClick={() => setActiveIndex(i)}
+          />
+        ))}
+      </div>
+
+      <PhotoDetail
+        photo={activeIndex !== null ? sorted[activeIndex] : null}
+        onClose={() => setActiveIndex(null)}
+        onPrev={() => setActiveIndex(i => (i !== null && i > 0 ? i - 1 : i))}
+        onNext={() => setActiveIndex(i => (i !== null && i < sorted.length - 1 ? i + 1 : i))}
+        hasPrev={activeIndex !== null && activeIndex > 0}
+        hasNext={activeIndex !== null && activeIndex < sorted.length - 1}
+      />
+    </>
   );
 }
