@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 // An 和 Ming 在一起的日期（根据实际情况改）
-const TOGETHER_SINCE = new Date('2015-01-01');
+const TOGETHER_SINCE = new Date('2015-01-13');
 
 export default function CoverPage() {
   const [days, setDays] = useState(0);
