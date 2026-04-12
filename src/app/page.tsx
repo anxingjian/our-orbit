@@ -1,12 +1,12 @@
 import CoverPage from '@/components/CoverPage';
 import PhotoList from '@/components/PhotoList';
-import { mockPhotos } from '@/data/mockPhotos';
+import { photos } from '@/data/photos';
 
 export default function Home() {
   return (
     <main style={{ background: 'var(--color-bg)', minHeight: '100vh' }}>
       <CoverPage />
-      <PhotoList photos={mockPhotos} />
+      <PhotoList photos={photos} />
 
       {/* 结尾页 */}
       <footer
