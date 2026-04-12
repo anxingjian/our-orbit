@@ -22,7 +22,6 @@ export default function SentenceLayout() {
         letterSpacing: '0.06em', color: 'var(--color-text-muted)',
       }}>
         <a href="/demo/breathing" style={{ textDecoration: 'none', color: 'inherit' }}>Masonry A</a>
-        <a href="/demo/scattered" style={{ textDecoration: 'none', color: 'inherit' }}>Polaroid</a>
         <a href="/demo/sentence" style={{ color: 'var(--color-text)', fontWeight: 500, textDecoration: 'none' }}>Sentence</a>
         <a href="/" style={{ textDecoration: 'none', color: 'inherit', marginLeft: 'auto' }}>← 返回</a>
       </nav>

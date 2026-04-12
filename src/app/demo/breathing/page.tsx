@@ -22,7 +22,6 @@ export default function BreathingLayout() {
         letterSpacing: '0.06em', color: 'var(--color-text-muted)',
       }}>
         <a href="/demo/breathing" style={{ color: 'var(--color-text)', fontWeight: 500, textDecoration: 'none' }}>Masonry A</a>
-        <a href="/demo/scattered" style={{ textDecoration: 'none', color: 'inherit' }}>Polaroid</a>
         <a href="/demo/sentence" style={{ textDecoration: 'none', color: 'inherit' }}>Sentence</a>
         <a href="/" style={{ textDecoration: 'none', color: 'inherit', marginLeft: 'auto' }}>← 返回</a>
       </nav>
