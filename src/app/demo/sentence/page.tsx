@@ -101,26 +101,21 @@ function PhotoCell({
         background: '#f0ece8',
       }}
     >
-      {/* 用 padding-top 撑开正确比例，不裁切 */}
-      <div style={{ position: 'relative', width: '100%', paddingTop: `${(1 / ratio) * 100}%` }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={photo.src}
-          alt={photo.title || ''}
-          loading="lazy"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-            display: 'block',
-            transition: 'opacity 0.3s ease',
-          }}
-          onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
-          onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
-        />
-      </div>
+      {/* 自然比例，不裁切 */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={photo.src}
+        alt={photo.title || ''}
+        loading="lazy"
+        style={{
+          width: '100%',
+          height: 'auto',
+          display: 'block',
+          transition: 'opacity 0.3s ease',
+        }}
+        onMouseEnter={e => (e.currentTarget.style.opacity = '0.9')}
+        onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+      />
     </div>
   );
 }
