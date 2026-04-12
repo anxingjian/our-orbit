@@ -69,6 +69,7 @@ export default function BreathingLayout() {
       }}>
         <a href="/demo/breathing" style={{ color: 'var(--color-text)', fontWeight: 500, textDecoration: 'none' }}>呼吸网格</a>
         <a href="/demo/scattered" style={{ textDecoration: 'none', color: 'inherit' }}>散落桌面</a>
+        <a href="/demo/sentence" style={{ textDecoration: 'none', color: 'inherit' }}>大小句式</a>
         <a href="/" style={{ textDecoration: 'none', color: 'inherit', marginLeft: 'auto' }}>← 返回</a>
       </div>
 

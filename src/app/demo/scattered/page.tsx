@@ -113,6 +113,7 @@ export default function ScatteredLayout() {
       }}>
         <a href="/demo/breathing" style={{ textDecoration: 'none', color: 'inherit' }}>呼吸网格</a>
         <a href="/demo/scattered" style={{ color: '#1c1a17', fontWeight: 500, textDecoration: 'none' }}>散落桌面</a>
+        <a href="/demo/sentence" style={{ textDecoration: 'none', color: 'inherit' }}>大小句式</a>
         <a href="/" style={{ textDecoration: 'none', color: 'inherit', marginLeft: 'auto' }}>← 返回</a>
       </div>
 
