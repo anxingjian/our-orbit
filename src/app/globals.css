@@ -1,6 +1,19 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600&family=Inter:wght@300;400;500&display=swap');
+@import "tailwindcss";
+
+:root {
+  /* Our Orbit 色彩系统 */
+  --color-bg: #faf9f6;           /* 奶油白背景 */
+  --color-bg-warm: #f5f3ee;      /* 稍深暖白 */
+  --color-text: #1c1a17;         /* 主文字 */
+  --color-text-secondary: #6b6760; /* 次级文字 */
+  --color-text-muted: #b0ada6;   /* 淡化文字（日期/页码） */
+  --color-border: #e8e4dd;       /* 边框 */
+
+  /* 字体 */
+  --font-display: 'Caveat', cursive;      /* Our Orbit 标题/手写感 */
+  --font-body: 'Inter', system-ui, sans-serif; /* 正文 */
+}
 
 * {
   margin: 0;
@@ -9,5 +22,53 @@
 }
 
 html {
-  background: #f0ebe0;
+  font-family: var(--font-body);
+  background: var(--color-bg);
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+::selection {
+  background: rgba(28, 26, 23, 0.08);
+}
+
+/* 照片渐显 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.photo-enter {
+  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0;
+}
+
+/* 轨道动画 */
+@keyframes orbit-a {
+  from { transform: rotate(0deg) translateX(32px) rotate(0deg); }
+  to   { transform: rotate(360deg) translateX(32px) rotate(-360deg); }
+}
+
+@keyframes orbit-b {
+  from { transform: rotate(180deg) translateX(32px) rotate(-180deg); }
+  to   { transform: rotate(540deg) translateX(32px) rotate(-540deg); }
+}
+
+.dot-a {
+  animation: orbit-a 20s linear infinite;
+}
+
+.dot-b {
+  animation: orbit-b 20s linear infinite;
 }
