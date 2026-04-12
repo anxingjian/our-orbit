@@ -1,11 +1,11 @@
 [
-  { "src": "/photos/01.jpg", "date": "2020-01-01", "width": 1600, "height": 1200 },
+  { "src": "/photos/01.jpg", "date": "2024-01-01", "width": 1600, "height": 1200 },
   { "src": "/photos/02.jpg", "date": "2024-03-16", "width": 1600, "height": 1200 },
   { "src": "/photos/03.jpg", "date": "2025-10-05", "width": 1600, "height": 1066 },
   { "src": "/photos/04.jpg", "date": "2021-10-06", "width": 1600, "height": 900  },
   { "src": "/photos/05.jpg", "date": "2015-08-13", "width": 1600, "height": 1200 },
   { "src": "/photos/06.jpg", "date": "2025-04-30", "width": 1600, "height": 1066 },
-  { "src": "/photos/07.jpg", "date": "2020-01-01", "width": 1600, "height": 1060 },
+  { "src": "/photos/07.jpg", "date": "2024-01-01", "width": 1600, "height": 1060 },
   { "src": "/photos/08.jpg", "date": "2019-08-25", "width": 1600, "height": 1207 },
   { "src": "/photos/09.jpg", "date": "2024-03-16", "width": 1600, "height": 1200 },
   { "src": "/photos/10.jpg", "date": "2019-01-19", "width": 1600, "height": 1600 },
